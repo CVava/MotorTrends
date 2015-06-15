@@ -1,0 +1,121 @@
+---
+output:
+  html_document:
+    keep_md: yes
+  pdf_document: default
+---
+Motor Trend Analysis
+========================================================
+### CVava, June 12^th^, 2015
+
+## Executive Summary
+
+```{r echo=FALSE}
+data(mtcars)
+
+# eliminate outliers
+mtc <- mtcars[mtcars$carb<6, ]         # Ferrari Dino (6), Maserati Bora (8)
+mtc <- mtc[mtc$carb!=4 | mtc$gear!=5,] # Ford Pantera L
+
+mtc_mean0 <- mean(mtc$mpg[mtc$am==0])
+mtc_mean1 <- mean(mtc$mpg[mtc$am==1])
+
+# model testing
+fitA <- lm(mpg ~ ., data = mtc)
+fitB <- lm(mpg ~ cyl + hp + drat + wt + qsec + am + gear + carb, data = mtc)
+fitC <- lm(mpg ~ hp + drat + wt + qsec + am + gear + carb, data = mtc)
+a <- anova(fitC, fitB, fitA, test="F")
+
+fit <- fitC
+
+Residuals = resid(fit) #lm.res) # residuals
+```
+
+The purpose of this analysis is to find out whether cars with automatic or manual transmission have a better MPG and if true by how much. We have based our analysis on the data extracted from the *1974 Motor Trend US* magazine and the results reflect the reality of this limited sample. 
+
+With confidence level better than 95% we estimate that a car from our data set with manual transmission has a higher **mpg** than a car with automatic transmission if all other things remain the same. 
+
+With confidence level of 95% based on our selected model we estimate that switching from automatic to manual transmission we expect a `r format(fit$coefficients['am'], digits=2)` increase in **mpg** (more precisely in the interval [`r format(fit$coefficients['am']-qnorm(.95)*summary(fit)$coefficients[, 2]['am'], digits=2)`,  `r format(fit$coefficients['am']+qnorm(.95)*summary(fit)$coefficients[, 2]['am'], digits=3)`]).
+
+**Major limitations**. This analysis is based only on car models from 1973 and 1974, there are very few samples, and the multivariate model is linear. An unusual factor limiting the value of this analysis is the complex economic and political environment of 1973-1974 including the **Oil Crisis of 1973** creating massive gas price inflation and shortages leading to a higher demand for more efficient cars while the automatic transmission was still under development. 
+
+## Exploratory Data Analysis
+
+The analysis is based on the **mtcars** set containing `r dim(mtcars)[1]` observations of `r dim(mtcars)[2]` variables (shown below with their meaning and type). Some variables will be treated as discrete due to their very low number of possible values. 
+
+Variable |Meaning | Type (# of levels)
+---------|--------|-------
+mpg |Miles/(US) gallon |continuous
+cyl |Number of cylinders |discrete (`r length(unique(mtcars$cyl))`)
+disp |Displacement (cu.in.) |continuous
+hp |Gross horsepower |continuous
+drat |Rear axle ratio |continuous
+wt |Weight (lb/1000) |continuous
+qsec |1/4 mile time |continuous
+vs |(V engine or Straight engine) |discrete (`r length(unique(mtcars$vs))`)
+am |Transmission (0 = automatic, 1 = manual) |discrete (`r length(unique(mtcars$am))`)
+gear |Number of forward gears |discrete (`r length(unique(mtcars$gear))`)
+carb |Number of carburetors |discrete (`r length(unique(mtcars$carb))`)
+
+Figure 1 from the Appendix shows the relations between all variables. *Carburetors* are represented by symbols (1 circle, 2 square, 3 diamond, 4 triangle), *cylinders* by outside color (4 black, 6 green, 8 cyan), *gear* by inside color (3 black, 4 red, 5 green), *engine type* by line width (thin vs thick), and *transmission type* by symbol size (manual shown as smaller).
+
+**Outliers**. We'll eliminate the samples with 6 and 8 carburetors since each has a single observation and an outlier effect (for 8 carburetors average **mpg** is `r format(mean(mtcars$mpg[mtcars$cyl==8]),digits=3)` vs average for the rest of `r format(mean(mtcars$mpg[mtcars$cyl!=8]),digits=3)`).  
+
+Figure 1 shows a large triangle with thin green line and cyan fill representing an unique car (straight engine, automatic, 5 gear, 8 cylinders, 4 carburetors) far away from all the other samples with common parameters.  
+
+**Meaningful Contributions**. All variables seem to have some effect on **mpg**. However, some variables appear highly correlated as **disp - cyl** (`r (format(cor(mtc$cyl, mtc$disp), digits=2))`), **disp - wt** (`r (format(cor(mtc$wt, mtc$disp), digits=2))`) and **cyl - wt** (`r (format(cor(mtc$cyl, mtc$wt), digits=2))`) and may be eliminated. 
+
+## Model Design
+
+As *Figure 1* shows, most high **mpg** cars have 4 cylinders, 3 gears, S engine, 1 or 2 carburetors, low weight, high *1/4 mile time* and manual transmission. To execute a comparison over the whole potential range of all variables we have to build a model. 
+
+After fitting three models (**Model A** - all variables, **Model B** - exclude **disp** and **vs**, **Model C** - exclude **disp**, **vs** and **cyl**) and doing the anova comparison we found large p-values (A - B as `r format(a$'Pr(>F)'[2], digits=2)`, B - C as `r format(a$'Pr(>F)'[3], digits=2)`). 
+
+*Figure 2* from the Appendix shows the residual plot of **Model C**. For the limited number of samples the spread appears acceptable. *Figure 3* shows the histogram of residuals "suggesting" the bell curve but with an elevated right half. To understand this slight aberration we have to remember the complex economical and political environment of 1973-1974 creating massive gas price inflation and shortages leading to a higher demand for more efficient cars (Toyota Corolla, Fiat 128, Chrysler Imperial, Merc 240D). *Figure 4* shows the same residuals making more obvious the effect of these unusual samples. 
+
+We have decided to retain **model C** for our analysis. It's R^2^ value of `r format(summary(fitC)$r.squared, digits=3)` is acceptable for such a small sample and is very close to the value `r format(summary(fitA)$r.squared, digits=3)` of **model A** (based on all variables). Residuals' distribution is acceptable and the histogram is the closest to a bell curve from any other linear model we have tested. 
+
+```{r echo=FALSE}
+summary(fit)$coefficients
+```
+
+The coefficients tell us for example that for each increase of 1000lb in **wt** we should expect to see an **mpg** decrease of `r format(fit$coefficients['wt'], digits=2)` and for each increase in the number of **gears** we should expect an **mpg** increase of `r format(fit$coefficients['gear'], digits=2)`. 
+
+## Is an automatic or manual transmission better for MPG
+
+```{r echo=FALSE}
+tHip <- t.test(mtcars$mpg[mtcars$am==1], mtcars$mpg[mtcars$am==0])$conf.int
+```
+
+A simplistic analysis (average **mpg** of all cars with or without automatic transmission) shows that a car with automatic transmission (**am** = 0) has a lower average **mpg** (`r format(mtc_mean0, digits=3)`) than with manual transmission (`r format(mtc_mean1, digits=3)`). 
+
+The 95% confidence interval for the difference between the **mpg** for cars with automatic and manual transmission is [`r format(tHip[1], digits=2)` `r format(tHip[2], digits=3)`] which implies again that the automatic transmission has a lower **mpg**. 
+
+From the retained model we can extract the coefficient for the **am** parameter which implies that switching from automatic to manual transmission we should expect a `r format(fit$coefficients['am'], digits=2)` increase in **mpg**. This value would be the best estimation if not for the limitations already mentioned. 
+
+## The MPG difference between automatic and manual transmissions
+
+The **MPG** differential can be estimated roughly from the **mpg** averages of cars with manual and automatic transmission as `r format(mtc_mean1-mtc_mean0, digits=3)`.  
+
+From the statistical analysis of the two data sets (manual and automatic transmission) we can infer the 95% confidence interval for the difference between the **mpg**s  [`r format(tHip[1], digits=2)` `r format(tHip[2], digits=3)`] as a better estimate. 
+
+Using the retained model we can derive the confidence interval for the **mpg** difference knowing that the **mpg** increase has a mean of `r format(fit$coefficients['am'], digits=2)` and a standard deviation of `r format(summary(fit)$coefficients[, 2]['am'], digits=3)`. With the same confidence level of 95% we can predict that the difference will be somewhere in the interval [`r format(fit$coefficients['am']-qnorm(.95)*summary(fit)$coefficients[, 2]['am'], digits=2)`,  `r format(fit$coefficients['am']+qnorm(.95)*summary(fit)$coefficients[, 2]['am'], digits=3)`]. 
+
+## Appendix
+
+```{r echo=FALSE, fig.width=7, fig.height=9.5}
+mtl <- mtcars[mtcars$carb<6, ]
+pairs(~mpg+hp+disp+drat+wt+qsec, data=mtl, col=mtl$cyl-3, pch=20+mtl$carb, bg=mtl$gear-2, cex=0.5+mtl$am/2, lwd=0.5+mtl$vs,
+   main="Fig 1. Exploratory Visualization of mtcars Data Set")
+
+```
+
+```{r echo=FALSE, fig.width=7, fig.height=4.5}
+plot(Residuals, main="Fig 2. Residuals Plot of Retained Model")
+hist(Residuals, main="Fig 3. Residuals Histogram of Retained Model")
+```
+
+```{r echo=FALSE, fig.width=7, fig.height=9.5}
+par(mfrow = c(2,2))
+plot(fit, main="Fig 4. Residuals of Retained Model")
+```
